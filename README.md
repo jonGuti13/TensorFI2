@@ -88,9 +88,7 @@ Let's see an example of how to inject a bit-flip into a layer state in the model
     Type: bitflips
     Amount: 1
     Bit: N
-
-
-This means that a single bit (chosen randomly as `N` is specified for `Bit`) will be flipped in the **state** tensor (as `Target` specified is `layer_states`) of **one** randomly chosen layer (as injection `Mode` specified is `single`) in the model.
+    Layer: N
 
 When running from the examples in this directory, this is the YAML file that gets picked up by the injector.
 

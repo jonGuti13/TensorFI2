@@ -6,6 +6,8 @@ Modifying the layer states is static and is done before the inference runs. This
 <img src="https://user-images.githubusercontent.com/29974283/119272285-0d840880-bbba-11eb-9a9f-d30c89c4b95c.png" height="370">
 </h1>
 
+It is now supported to select the layer where the fault is going to be injected.
+
 ##### Benchmarks and datasets
 
 In this and [tests/layer-outputs](https://github.com/DependableSystemsLab/TensorFI2/blob/master/tests/layer-outputs) directories, we provide the ML models we have tested the tool with. These include smaller models like the simple and convolutional neural networks that work with MNIST and CIFAR-10 datasets to the more complex models like ResNet-50, VGG16, SqueezeNet that use the ImageNet dataset.

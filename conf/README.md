@@ -40,6 +40,10 @@ The *Amount* of faults are of two types - either the exact number or a percentag
 
 The *Bit* is specified only if *bitflips* fault type are chosen. If the user wants the bit to be flipped to be chosen randomly by the injector during runtime, *N* is specified. Otherwise, the bit position to be flipped can be indicated with a value between 0 and 31. This is because we assume the models we consider use float32 precision.
 
+#### 6. Layer
+
+The *Layer* is specified only if *layer_states* Target and *single* Mode are chosen. If the user wants the bit to be flipped by the injector in a randomly chosen layerm, *N* is specified. Otherwise, the layer number where the bit is going to be flipped can be indicated with a value between 0 and *number_of_trainable_parameters* - 1. The number of trainable parameters depends on the model you are woriking with.
+
 ### Example configuration files
 
 We provide two example config files and explain the injection for each.
