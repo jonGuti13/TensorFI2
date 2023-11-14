@@ -65,16 +65,24 @@ num = test_images.shape[0]
 totsdc = 0.0
 
 ind = []
+#Selecciona al azar numInjections+offset números dentro de una lista que empieza en 0 y termina en num (cada número es el ID de una imagen).
 init = random.sample(range(num), numInjections+offset)
 model.load_weights('h5/nn-trained.h5')
 
 for i in init:
         test_loss, test_acc = model.evaluate(test_images[i:i+1], test_labels[i:i+1], verbose=0)
+        #De entre esos números seleccionados escoge a su vez los que estén asociados a una imagen cuya evaluación dé un resultado correcto (accuracy = 1), es decir, que acierte el número a predecir.
         if(test_acc == 1.):
                 ind.append(i)
+#A su vez, se queda con los primeros numInjections índices.
 ind = ind[:numInjections]
 
 start = time.time()
+#No comprendo este loop exterior del todo. Pensaba que era para insertar más de un error a la vez, pero eso se hace en el archivo de configuración .yaml
+#Es simplemente por si quieres ver cómo afectan numFaults inyecciones distintas (una cada vez) a la red, lo mismo que ejecutar varias veces el script.
+
+print(model.summary())
+
 for i in range(numFaults):
     model.load_weights('h5/nn-trained.h5')
 
@@ -83,8 +91,11 @@ for i in range(numFaults):
     sdc = 0.
     for i in ind:
         test_loss, test_acc = model.evaluate(test_images[i:i+1], test_labels[i:i+1], verbose=0)
+
         if(test_acc == 0.):
+            print("Este peso ha ocasionado que la salida no sea correcta en la imagen", i, "\n")
             sdc = sdc + 1.
+    print("\n")
     f.write(str(sdc/numInjections))
     f.write("\n")
     totsdc = totsdc + sdc
