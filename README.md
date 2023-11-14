@@ -1,4 +1,4 @@
-<h1 align="center"> 
+<h1 align="center">
   <img src="https://user-images.githubusercontent.com/29974283/100801172-78f3d700-33dc-11eb-8756-375ddbd740ca.png" height="120">
 </h1>
 
@@ -19,13 +19,15 @@ Welcome to TensorFI 2's GitHub page!
 
 ### Table of Contents
 
-1. [Introduction](#introduction)
-2. [Dependencies](#dependencies)
-3. [Architecture](#architecture)
-4. [Installation](#installation)
-5. [Configuration](#configuration)
-6. [Usage](#usage)
-7. [Contributing](#contributing)
+- [Table of Contents](#table-of-contents)
+- [Introduction](#introduction)
+- [Dependencies](#dependencies)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Configuration](#configuration)
+    - [sample.yaml](#sampleyaml)
+- [Usage](#usage)
+- [Contributing](#contributing)
 
 ### Introduction
 
@@ -35,15 +37,15 @@ The fault injector is easily configurable with YAML.
 
 ### Dependencies
 
-1. TensorFlow framework (v2.0 or greater)
+1. TensorFlow framework (tested with 2.12.0)
 
-2. Python (v3 or greater)
+2. Python (tested with 3.8.6)
 
-3. PyYaml (v3 or greater)
+3. PyYaml (tested with v6.0)
 
-4. Keras framework (part of TensorFlow)
+4. Keras framework (tested with 2.12.0, part of TensorFlow)
 
-5. numpy package (part of TensorFlow)
+5. numpy package (tested with 1.23.5, part of TensorFlow)
 
 
 ### Architecture
@@ -80,7 +82,7 @@ Installation has just two steps - downloading the source and adding it to `PATH`
 Let's see an example of how to inject a bit-flip into a layer state in the model. Go to [experiments/layer-states](https://github.com/DependableSystemsLab/TensorFI2/blob/master/experiments/layer-states) and set the sample.yaml file in [experiments/layer-states/confFiles](https://github.com/DependableSystemsLab/TensorFI2/tree/master/experiments/layer-states/confFiles) with the following configuration:
 
 ##### sample.yaml
-    
+
     Target: layer_states
     Mode: single
     Type: bitflips
