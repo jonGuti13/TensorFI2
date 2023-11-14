@@ -2,4 +2,6 @@ Target: layer_states
 Mode: single
 Type: bitflips
 Amount: 1
-Bit: N
+Bit: 20
+Layer: 12
+Images: 10

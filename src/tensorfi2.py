@@ -12,7 +12,7 @@ import random, math
 from src import config
 
 def bitflip(f, pos):
-	
+
 	""" Single bit-flip in 32 bit floats """
 
 	f_ = pack('f', f)
@@ -42,9 +42,9 @@ class inject():
 		fiFunc(model, fiConf, **kwargs)
 
 	def layer_states(self, model, fiConf, **kwargs):
-		
+
 		""" FI in layer states """
-		
+
 		if(fiConf["Mode"] == "single"):
 
 			""" Single layer fault injection mode """
@@ -56,11 +56,21 @@ class inject():
 			fiSz = fiConf["Amount"]
 
 			# Choose a random layer for injection
-			randnum = random.randint(0, len(model.trainable_variables) - 1)
+			# If random layer is chosen
+			if(fiConf["Layer"] == "N"):
+				layernum = random.randint(0, len(model.trainable_variables) - 1)
+				#Ojo, los bias están separados de los weights. Ambas son trainable_variables.
+				#print("La capa escogida para insertar el peso aleatorio es la número:", layernum)
+
+			# If layer position is specified for flip
+			else:
+				layernum = int(fiConf["Layer"])
 
 			# Get layer states info
-			v = model.trainable_variables[randnum]
+			v = model.trainable_variables[layernum]
+			#print("El nombre de la capa es:", v.name)
 			num = v.shape.num_elements()
+			#print("La capa tiene", num, "pesos en forma de", v.shape)
 
 			if(fiFault == "zeros"):
 				fiSz = (fiSz * num) / 100
@@ -68,6 +78,8 @@ class inject():
 
 			# Choose the indices for FI
 			ind = random.sample(range(num), fiSz)
+			#print("El fault injection se va a insertar en el peso número", ind)
+
 
 			# Unstack elements into a single dimension
 			elem_shape = v.shape
@@ -85,7 +97,7 @@ class inject():
 			elif(fiFault == "bitflips"):
 				for item in ind:
 					val = v_[item]
-					
+
 					# If random bit chosen to be flipped
 					if(fiConf["Bit"] == "N"):
 						pos = random.randint(0, 31)
@@ -95,6 +107,9 @@ class inject():
 						pos = int(fiConf["Bit"])
 					val_ = bitflip(val, pos)
 					v_[item] = val_
+
+					#print("Se ha modificado el bit número:", pos)
+					#print("El peso antiguo tenía un valor de", val, "y ahora tiene un valor de", val_)
 
 			# Reshape into original dimensions and store the faulty tensor
 			v_ = tf.stack(v_)
@@ -226,7 +241,7 @@ class inject():
 			# return pred
 			labels = np.argmax(pred, axis=-1)
 			return labels[0]
-			
+
 			logging.info("Completed injections... exiting")
 
 		elif(fiConf["Mode"] == "multiple"):
@@ -296,5 +311,5 @@ class inject():
 				# return pred
 				labels = np.argmax(pred, axis=-1)
 				return labels[0]
-				
-				logging.info("Completed injections... exiting")				
+
+				logging.info("Completed injections... exiting")
