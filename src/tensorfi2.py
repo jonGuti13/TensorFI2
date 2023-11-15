@@ -69,23 +69,27 @@ class inject():
 			# Get layer states info
 			v = model.trainable_variables[layernum]
 			#print("El nombre de la capa es:", v.name)
-			num = v.shape.num_elements()
+			# num = v.shape.num_elements()
 			#print("La capa tiene", num, "pesos en forma de", v.shape)
+			train_variables_numpy = v.numpy()
 
 			if(fiFault == "zeros"):
 				fiSz = (fiSz * num) / 100
 				fiSz = math.floor(fiSz)
 
-			# Choose the indices for FI
-			ind = random.sample(range(num), fiSz)
-			#print("El fault injection se va a insertar en el peso número", ind)
+			# Hay dos opciones, o que la capa tenga 4 dimensiones (kernel de convolución) o que la capa tenga 1 dimensión (bias de convolución, mu de BN, sigma de BN).
+			if len(v.shape) == 1:
+				# Choose the indices for FI
+				ind0 = random.sample(range(v.shape[0]), fiSz)
+				train_parameter = train_variables_numpy[ind0]
 
-
-			# Unstack elements into a single dimension
-			elem_shape = v.shape
-			v_ = tf.identity(v)
-			v_ = tf.keras.backend.flatten(v_)
-			v_ = tf.unstack(v_)
+			else:
+				# Choose the indices for FI
+				ind0 = random.sample(range(v.shape[0]), fiSz)
+				ind1 = random.sample(range(v.shape[1]), fiSz)
+				ind2 = random.sample(range(v.shape[2]), fiSz)
+				ind3 = random.sample(range(v.shape[3]), fiSz)
+				train_parameter = train_variables_numpy[ind0, ind1, ind2, ind3]
 
 			# Inject the specified fault into the randomly chosen values
 			if(fiFault == "zeros"):
@@ -95,26 +99,24 @@ class inject():
 				for item in ind:
 					v_[item] = np.random.random()
 			elif(fiFault == "bitflips"):
-				for item in ind:
-					val = v_[item]
 
-					# If random bit chosen to be flipped
-					if(fiConf["Bit"] == "N"):
-						pos = random.randint(0, 31)
+				# If random bit chosen to be flipped
+				if(fiConf["Bit"] == "N"):
+					pos = random.randint(0, 31)
 
-					# If bit position specified for flip
-					else:
-						pos = int(fiConf["Bit"])
-					val_ = bitflip(val, pos)
-					v_[item] = val_
+				# If bit position specified for flip
+				else:
+					pos = int(fiConf["Bit"])
+				train_parameter_fi = bitflip(train_parameter, pos)
+				if len(v.shape) == 1:
+					train_variables_numpy[ind0] = train_parameter_fi
+				else:
+					train_variables_numpy[ind0, ind1, ind2, ind3] = train_parameter_fi
 
-					#print("Se ha modificado el bit número:", pos)
-					#print("El peso antiguo tenía un valor de", val, "y ahora tiene un valor de", val_)
+			#print("Se ha modificado el bit número:", pos)
+			#print("El peso antiguo tenía un valor de", val, "y ahora tiene un valor de", val_)
 
-			# Reshape into original dimensions and store the faulty tensor
-			v_ = tf.stack(v_)
-			v_ = tf.reshape(v_, elem_shape)
-			v.assign(v_)
+			v.assign(train_variables_numpy)
 
 			logging.info("Completed injections... exiting")
 
