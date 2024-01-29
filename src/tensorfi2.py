@@ -42,25 +42,6 @@ def bitflip_int8(value, pos):
 
     return modified_value
 
-def bitflip_int32(value, pos):
-    """ Single bit-flip in 32-bit signed integers, counting from right to left """
-
-    # Ensure that 'value' is within the valid range for signed 32-bit integers
-    if (value > 2147483647) | (value < -2147483648):
-        raise("El valor no está en int8")
-
-    # Convert the signed integer to its binary representation
-    binary_representation = bin(value & 0xFFFFFFFF)[2:].zfill(32)
-
-    # Flip the specified bit in the binary representation
-    flipped_binary = list(binary_representation)
-    flipped_binary[31 - pos] = '1' if binary_representation[31 - pos] == '0' else '0'
-
-    # Convert the modified binary representation back to an integer
-    modified_value = int(''.join(flipped_binary), 2)
-
-    return modified_value
-
 class inject():
 	def __init__(
 		self, model, confFile, interpreter=None, log_level="ERROR", **kwargs
@@ -109,9 +90,13 @@ class inject():
 			if (fiFormat == "fp32"):
 				v = model.trainable_variables[layernum]
 				train_variables_numpy = v.numpy()
-			else:
+			elif (fiFormat == "int8"):
 				v = model.buffers[layernum].data.reshape(interpreter.get_tensor(layernum-1).shape)
 				train_variables_numpy = v
+			elif (fiFormat == "int32"):
+				v = model.buffers[layernum].data
+				train_variables_numpy = v
+
 			#print("El nombre de la capa es:", v.name)
 			# num = v.shape.num_elements()
 			#print("La capa tiene", num, "pesos en forma de", v.shape)
@@ -119,20 +104,6 @@ class inject():
 			if(fiFault == "zeros"):
 				fiSz = (fiSz * num) / 100
 				fiSz = math.floor(fiSz)
-
-			# Hay dos opciones, o que la capa tenga 4 dimensiones (kernel de convolución) o que la capa tenga 1 dimensión (bias de convolución, mu de BN, sigma de BN).
-			if len(v.shape) == 1:
-				# Choose the indices for FI
-				ind0 = random.sample(range(v.shape[0]), fiSz)
-				train_parameter = train_variables_numpy[ind0]
-
-			else:
-				# Choose the indices for FI
-				ind0 = random.sample(range(v.shape[0]), fiSz)
-				ind1 = random.sample(range(v.shape[1]), fiSz)
-				ind2 = random.sample(range(v.shape[2]), fiSz)
-				ind3 = random.sample(range(v.shape[3]), fiSz)
-				train_parameter = train_variables_numpy[ind0, ind1, ind2, ind3]
 
 			# Inject the specified fault into the randomly chosen values
 			if(fiFault == "zeros"):
@@ -155,11 +126,40 @@ class inject():
 				# If bit position specified for flip
 				else:
 					pos = int(fiConf["Bit"])
+					# Hay dos opciones, o que la capa tenga 4 dimensiones (kernel de convolución) o que la capa tenga 1 dimensión (bias de convolución, mu de BN, sigma de BN).
+					if len(v.shape) == 1:
+						if fiFormat == "int32":
+          					#Los datos de 32 bits se almacenan en 4 bytes por lo que si quiero cambiar un bit concreto tengo que elegir el byte adecuado
+							#Para el caso particular en el que hay 52 bias de 32 bits, tenemos 52*4 valores de 32/4 bits, por lo que v.shape[0] = 208.
+							#v[0], v[1], v[2], v[3] forman el primer elemento así v[3] * 2^24 + v[2] * 2^16 + v[1] * 2^8 + v[0]
+							#mult se encarga de seleccionar 1 de esos 52 bias y nos da un valor entre 0 y 51. 4*mult nos pone al inicio de los 4 elementos que conforman un bias.
+							#Dependiendo del bit que se quiera cambiar, nos desplazamos 3, 2, 1 o 0 posiciones.
+							mult = random.sample(range(int(v.shape[0]/4)), fiSz)[0]
+							if (pos >= 0) & (pos < 8):
+								ind0 = 0 + 4 * mult
+							elif (pos >= 8) & (pos < 16):
+								ind0 = 1 + 4 * mult
+							elif (pos >= 16) & (pos < 24):
+								ind0 = 2 + 4 * mult
+							elif (pos >= 24) & (pos < 32):
+								ind0 = 3 + 4 * mult
+						else:
+							# Choose the indices for FI
+							ind0 = random.sample(range(0, v.shape[0]), fiSz)
+						train_parameter = train_variables_numpy[ind0]
+
+					else:
+						# Choose the indices for FI
+						ind0 = random.sample(range(v.shape[0]), fiSz)
+						ind1 = random.sample(range(v.shape[1]), fiSz)
+						ind2 = random.sample(range(v.shape[2]), fiSz)
+						ind3 = random.sample(range(v.shape[3]), fiSz)
+						train_parameter = train_variables_numpy[ind0, ind1, ind2, ind3]
 
 				if fiFormat == "fp32":
 					train_parameter_fi = bitflip(train_parameter, pos)
 				elif fiFormat == "int32":
-					train_parameter_fi = bitflip_int32(train_parameter[0], pos)
+					train_parameter_fi = bitflip_int8(train_parameter.view(dtype=np.int8), pos % 8)
 				elif fiFormat == "int8":
 					train_parameter_fi = bitflip_int8(train_parameter[0].view(dtype=np.int8), pos)
 				else:
