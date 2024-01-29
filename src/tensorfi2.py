@@ -23,9 +23,47 @@ def bitflip(f, pos):
 	f = unpack('f', f_)
 	return f[0]
 
+def bitflip_int8(value, pos):
+    """ Single bit-flip in 8-bit signed integers, counting from right to left """
+
+    # Ensure that 'value' is within the valid range for signed 8-bit integers
+    if (value > 127) | (value < -128):
+        raise("El valor no está en int8")
+
+    # Convert the signed integer to its binary representation
+    binary_representation = bin(value & 0xFF)[2:].zfill(8)
+
+    # Flip the specified bit in the binary representation
+    flipped_binary = list(binary_representation)
+    flipped_binary[7 - pos] = '1' if binary_representation[7 - pos] == '0' else '0'
+
+    # Convert the modified binary representation back to an integer
+    modified_value = int(''.join(flipped_binary), 2)
+
+    return modified_value
+
+def bitflip_int32(value, pos):
+    """ Single bit-flip in 32-bit signed integers, counting from right to left """
+
+    # Ensure that 'value' is within the valid range for signed 32-bit integers
+    if (value > 2147483647) | (value < -2147483648):
+        raise("El valor no está en int8")
+
+    # Convert the signed integer to its binary representation
+    binary_representation = bin(value & 0xFFFFFFFF)[2:].zfill(32)
+
+    # Flip the specified bit in the binary representation
+    flipped_binary = list(binary_representation)
+    flipped_binary[31 - pos] = '1' if binary_representation[31 - pos] == '0' else '0'
+
+    # Convert the modified binary representation back to an integer
+    modified_value = int(''.join(flipped_binary), 2)
+
+    return modified_value
+
 class inject():
 	def __init__(
-		self, model, confFile, log_level="ERROR", **kwargs
+		self, model, confFile, interpreter=None, log_level="ERROR", **kwargs
 		):
 
 		# Logging setup
@@ -39,9 +77,9 @@ class inject():
 
 		# Call the corresponding FI function
 		fiFunc = getattr(self, fiConf["Target"])
-		fiFunc(model, fiConf, **kwargs)
+		fiFunc(model, fiConf, interpreter=interpreter, **kwargs)
 
-	def layer_states(self, model, fiConf, **kwargs):
+	def layer_states(self, model, fiConf, interpreter=None, **kwargs):
 
 		""" FI in layer states """
 
@@ -54,6 +92,7 @@ class inject():
 			# Retrieve type and amount of fault
 			fiFault = fiConf["Type"]
 			fiSz = fiConf["Amount"]
+			fiFormat = fiConf["Format"]
 
 			# Choose a random layer for injection
 			# If random layer is chosen
@@ -67,11 +106,15 @@ class inject():
 				layernum = int(fiConf["Layer"])
 
 			# Get layer states info
-			v = model.trainable_variables[layernum]
+			if (fiFormat == "fp32"):
+				v = model.trainable_variables[layernum]
+				train_variables_numpy = v.numpy()
+			else:
+				v = model.buffers[layernum].data.reshape(interpreter.get_tensor(layernum-1).shape)
+				train_variables_numpy = v
 			#print("El nombre de la capa es:", v.name)
 			# num = v.shape.num_elements()
 			#print("La capa tiene", num, "pesos en forma de", v.shape)
-			train_variables_numpy = v.numpy()
 
 			if(fiFault == "zeros"):
 				fiSz = (fiSz * num) / 100
@@ -102,21 +145,35 @@ class inject():
 
 				# If random bit chosen to be flipped
 				if(fiConf["Bit"] == "N"):
-					pos = random.randint(0, 31)
+					if (fiFormat == "fp32" | fiFormat == "int32"):
+						pos = random.randint(0, 31)
+					elif fiFormat == "int8":
+						pos = random.randint(0, 7)
+					else:
+						raise("Formato mal especificado")
 
 				# If bit position specified for flip
 				else:
 					pos = int(fiConf["Bit"])
-				train_parameter_fi = bitflip(train_parameter, pos)
+
+				if fiFormat == "fp32":
+					train_parameter_fi = bitflip(train_parameter, pos)
+				elif fiFormat == "int32":
+					train_parameter_fi = bitflip_int32(train_parameter[0], pos)
+				elif fiFormat == "int8":
+					train_parameter_fi = bitflip_int8(train_parameter[0].view(dtype=np.int8), pos)
+				else:
+					raise("Formato mal especificado")
+
 				if len(v.shape) == 1:
 					train_variables_numpy[ind0] = train_parameter_fi
 				else:
 					train_variables_numpy[ind0, ind1, ind2, ind3] = train_parameter_fi
 
-			#print("Se ha modificado el bit número:", pos)
-			#print("El peso antiguo tenía un valor de", val, "y ahora tiene un valor de", val_)
-
-			v.assign(train_variables_numpy)
+			if (fiFormat == "fp32"):
+				v.assign(train_variables_numpy)
+			else:
+				None
 
 			logging.info("Completed injections... exiting")
 
