@@ -120,7 +120,7 @@ def check_exponent_bits_completiveness(binary_representation):
 	if exponent_bits[0] == '0':
     	# Check if the rest of the exponent bits are all '1' except one
 		if exponent_bits[1:].count('1') == 7:									#Caso válido	 = 1
-			return 'Restar', 0
+			return 'Ambos', 0
 		elif exponent_bits[1:].count('1') == 6:
 			if exponent_bits[7] == '0':											#Descartar caso 0111 1110 = 0.5
 				return None, None
