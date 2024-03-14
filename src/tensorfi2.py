@@ -66,33 +66,50 @@ class inject():
 
 			# Get layer states info
 			v = model.trainable_variables[layernum]
-			num = v.shape.num_elements()
+			train_variables_numpy = v.numpy()
 
 			if(fiFault == "zeros"):
 				fiSz = (fiSz * num) / 100
 				fiSz = math.floor(fiSz)
 
-			# Choose the indices for FI
-			ind = random.sample(range(num), fiSz)
+			# If the layer is a 1D array (bias of convolution layer or gamma or beta parameters of batch normalization layers, for example).
+			if len(v.shape) == 1:
+				# Choose the indices for FI
+				ind0 = random.sample(range(v.shape[0]), fiSz)
 
+			# If the layer is a 2D array (dense layer, for example).
+			elif len(v.shape) == 2:
+				# Choose the indices for FI
+				ind0 = random.sample(range(v.shape[0]), fiSz)
+				ind1 = random.sample(range(v.shape[1]), fiSz)
 
-			# Unstack elements into a single dimension
-			elem_shape = v.shape
-			v_ = tf.identity(v)
-			v_ = tf.keras.backend.flatten(v_)
-			v_ = tf.unstack(v_)
+			# If the layer is a 4D array (kernel of convolution layer, for example)
+			else:
+				# Choose the indices for FI
+				ind0 = random.sample(range(v.shape[0]), fiSz)
+				ind1 = random.sample(range(v.shape[1]), fiSz)
+				ind2 = random.sample(range(v.shape[2]), fiSz)
+				ind3 = random.sample(range(v.shape[3]), fiSz)
 
 			# Inject the specified fault into the randomly chosen values
 			if(fiFault == "zeros"):
-				for item in ind:
-					v_[item] = 0.
+				for i in range(len(ind0)):
+					if len(v.shape) == 1:
+						train_variables_numpy[ind0[i]] = 0
+					elif len(v.shape) == 2:
+						train_variables_numpy[ind0[i], ind1[i]] = 0
+					else:
+						train_variables_numpy[ind0[i], ind1[i], ind2[i], ind3[i]] = 0
 			elif(fiFault == "random"):
-				for item in ind:
-					v_[item] = np.random.random()
+				for i in range(len(ind0)):
+					if len(v.shape) == 1:
+						train_variables_numpy[ind0[i]] = np.random.random()
+					elif len(v.shape) == 2:
+						train_variables_numpy[ind0[i], ind1[i]] = np.random.random()
+					else:
+						train_variables_numpy[ind0[i], ind1[i], ind2[i], ind3[i]] = np.random.random()
 			elif(fiFault == "bitflips"):
-				for item in ind:
-					val = v_[item]
-
+				for i in range(len(ind0)):
 					# If random bit chosen to be flipped
 					if(fiConf["Bit"] == "N"):
 						pos = random.randint(0, 31)
@@ -100,14 +117,21 @@ class inject():
 					# If bit position specified for flip
 					else:
 						pos = int(fiConf["Bit"])
-					val_ = bitflip(val, pos)
-					v_[item] = val_
 
+					if len(v.shape) == 1:
+						train_parameter = train_variables_numpy[ind0[i]]
+						train_parameter_fi = bitflip(train_parameter, pos)
+						train_variables_numpy[ind0[i]] = train_parameter_fi
+					elif len(v.shape) == 2:
+						train_parameter = train_variables_numpy[ind0[i], ind1[i]]
+						train_parameter_fi = bitflip(train_parameter, pos)
+						train_variables_numpy[ind0[i], ind1[i]] = train_parameter_fi
+					else:
+						train_parameter = train_variables_numpy[ind0[i], ind1[i], ind2[i], ind3[i]]
+						train_parameter_fi = bitflip(train_parameter, pos)
+						train_variables_numpy[ind0[i], ind1[i], ind2[i], ind3[i]] = train_parameter_fi
 
-			# Reshape into original dimensions and store the faulty tensor
-			v_ = tf.stack(v_)
-			v_ = tf.reshape(v_, elem_shape)
-			v.assign(v_)
+			v.assign(train_variables_numpy)
 
 			logging.info("Completed injections... exiting")
 
