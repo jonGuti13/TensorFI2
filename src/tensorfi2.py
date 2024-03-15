@@ -94,6 +94,9 @@ class inject():
 			elif (fiFormat == "int8"):
 				v = model.buffers[layernum].data.reshape(interpreter.get_tensor(layernum-1).shape)
 				train_variables_numpy = v
+			elif (fiFormat == "int32"):
+				v = model.buffers[layernum].data
+				train_variables_numpy = v
 
 			if(fiFault == "zeros"):
 				fiSz = (fiSz * num) / 100
@@ -101,7 +104,10 @@ class inject():
 
 			# If the layer is a 1D array (bias of convolution layer or gamma or beta parameters of batch normalization layers, for example).
 			if len(v.shape) == 1:
-				ind0 = random.sample(range(v.shape[0]), fiSz)
+				if fiFormat != "int32":
+					ind0 = random.sample(range(v.shape[0]), fiSz)
+				else:
+					ind0 = random.sample(range(int(v.shape[0]/4)), fiSz)
 
 			# If the layer is a 2D array (dense layer, for example).
 			elif len(v.shape) == 2:
@@ -129,6 +135,8 @@ class inject():
 				for i in range(len(ind0)):
 					if (fiFormat == "fp32"):
 						randomNumber = np.random.random()
+					elif fiFormat == "int32":
+						randomNumber = random.randint(0, 4294967295)
 					elif fiFormat == "int8":
 						randomNumber = random.randint(0, 255)
 
@@ -142,7 +150,7 @@ class inject():
 				for i in range(len(ind0)):
 					# If random bit chosen to be flipped
 					if(fiConf["Bit"] == "N"):
-						if (fiFormat == "fp32"):
+						if (fiFormat == "fp32" or fiFormat == "int32"):
 							pos = random.randint(0, 31)
 						elif fiFormat == "int8":
 							pos = random.randint(0, 7)
@@ -153,8 +161,21 @@ class inject():
 					else:
 						pos = int(fiConf["Bit"])
 
-					# If the layer is a 1D array (bias of convolution layer or gamma or beta parameters of batch normalization layers, for example).
 					if len(v.shape) == 1:
+						if fiFormat == "int32":
+							#Each 32-bit bias is represented via 4 consecutive 8-bit integers in the whole bias array,
+       						#so to get the index of the 8-bit element that must be changed, the index of the bias and
+             				#by specifying bit position that is going to be changed must be known in advance.
+
+							if (pos >= 0) & (pos < 8):
+								ind0[i] = 0 + 4 * ind0[i]
+							elif (pos >= 8) & (pos < 16):
+								ind0[i] = 1 + 4 * ind0[i]
+							elif (pos >= 16) & (pos < 24):
+								ind0[i] = 2 + 4 * ind0[i]
+							elif (pos >= 24) & (pos < 32):
+								ind0[i] = 3 + 4 * ind0[i]
+
 						train_parameter = train_variables_numpy[ind0[i]]
 					elif len(v.shape) == 2:
 						train_parameter = train_variables_numpy[ind0[i], ind1[i]]
@@ -164,6 +185,8 @@ class inject():
 
 					if fiFormat == "fp32":
 						train_parameter_fi = bitflip(train_parameter, pos)
+					elif fiFormat == "int32":
+						train_parameter_fi = bitflip_int8(train_parameter.view(dtype=np.int8), pos % 8)
 					elif fiFormat == "int8":
 						train_parameter_fi = bitflip_int8(train_parameter.view(dtype=np.int8), pos)
 					else:

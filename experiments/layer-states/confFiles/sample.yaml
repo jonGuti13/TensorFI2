@@ -4,4 +4,4 @@ Type: bitflips
 Amount: 1
 Bit: N
 Layer: N
-Format: int8
+Format: int32
