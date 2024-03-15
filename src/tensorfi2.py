@@ -23,9 +23,28 @@ def bitflip(f, pos):
 	f = unpack('f', f_)
 	return f[0]
 
+def bitflip_int8(value, pos):
+    """ Single bit-flip in 8-bit signed integers, counting from right to left """
+
+    # Ensure that 'value' is within the valid range for signed 8-bit integers
+    if (value > 127) | (value < -128):
+        raise("El valor no está en int8")
+
+    # Convert the signed integer to its binary representation
+    binary_representation = bin(value & 0xFF)[2:].zfill(8)
+
+    # Flip the specified bit in the binary representation
+    flipped_binary = list(binary_representation)
+    flipped_binary[7 - pos] = '1' if binary_representation[7 - pos] == '0' else '0'
+
+    # Convert the modified binary representation back to an integer
+    modified_value = int(''.join(flipped_binary), 2)
+
+    return modified_value
+
 class inject():
 	def __init__(
-		self, model, confFile, log_level="ERROR", **kwargs
+		self, model, confFile, interpreter=None, log_level="ERROR", **kwargs
 		):
 
 		# Logging setup
@@ -39,9 +58,9 @@ class inject():
 
 		# Call the corresponding FI function
 		fiFunc = getattr(self, fiConf["Target"])
-		fiFunc(model, fiConf, **kwargs)
+		fiFunc(model, fiConf, interpreter=interpreter, **kwargs)
 
-	def layer_states(self, model, fiConf, **kwargs):
+	def layer_states(self, model, fiConf, interpreter=None, **kwargs):
 
 		""" FI in layer states """
 
@@ -54,19 +73,27 @@ class inject():
 			# Retrieve type and amount of fault
 			fiFault = fiConf["Type"]
 			fiSz = fiConf["Amount"]
+			fiFormat = fiConf["Format"]
 
 			# Choose a random layer for injection
 			# If random layer is chosen
 			if(fiConf["Layer"] == "N"):
-				layernum = random.randint(0, len(model.trainable_variables) - 1)
+				if (fiFormat != "fp32"):
+					layernum = random.randint(firstIndex, lastIndex)
+				else:
+					layernum = random.randint(0, len(model.trainable_variables) - 1)
 
 			# If layer position is specified for flip
 			else:
 				layernum = int(fiConf["Layer"])
 
 			# Get layer states info
-			v = model.trainable_variables[layernum]
-			train_variables_numpy = v.numpy()
+			if (fiFormat == "fp32"):
+				v = model.trainable_variables[layernum]
+				train_variables_numpy = v.numpy()
+			elif (fiFormat == "int8"):
+				v = model.buffers[layernum].data.reshape(interpreter.get_tensor(layernum-1).shape)
+				train_variables_numpy = v
 
 			if(fiFault == "zeros"):
 				fiSz = (fiSz * num) / 100
@@ -74,12 +101,10 @@ class inject():
 
 			# If the layer is a 1D array (bias of convolution layer or gamma or beta parameters of batch normalization layers, for example).
 			if len(v.shape) == 1:
-				# Choose the indices for FI
 				ind0 = random.sample(range(v.shape[0]), fiSz)
 
 			# If the layer is a 2D array (dense layer, for example).
 			elif len(v.shape) == 2:
-				# Choose the indices for FI
 				ind0 = random.sample(range(v.shape[0]), fiSz)
 				ind1 = random.sample(range(v.shape[1]), fiSz)
 
@@ -102,36 +127,59 @@ class inject():
 						train_variables_numpy[ind0[i], ind1[i], ind2[i], ind3[i]] = 0
 			elif(fiFault == "random"):
 				for i in range(len(ind0)):
+					if (fiFormat == "fp32"):
+						randomNumber = np.random.random()
+					elif fiFormat == "int8":
+						randomNumber = random.randint(0, 255)
+
 					if len(v.shape) == 1:
-						train_variables_numpy[ind0[i]] = np.random.random()
+						train_variables_numpy[ind0[i]] = randomNumber
 					elif len(v.shape) == 2:
-						train_variables_numpy[ind0[i], ind1[i]] = np.random.random()
+						train_variables_numpy[ind0[i], ind1[i]] = randomNumber
 					else:
-						train_variables_numpy[ind0[i], ind1[i], ind2[i], ind3[i]] = np.random.random()
+						train_variables_numpy[ind0[i], ind1[i], ind2[i], ind3[i]] = randomNumber
 			elif(fiFault == "bitflips"):
 				for i in range(len(ind0)):
 					# If random bit chosen to be flipped
 					if(fiConf["Bit"] == "N"):
-						pos = random.randint(0, 31)
+						if (fiFormat == "fp32"):
+							pos = random.randint(0, 31)
+						elif fiFormat == "int8":
+							pos = random.randint(0, 7)
+						else:
+							raise("Formato mal especificado")
 
 					# If bit position specified for flip
 					else:
 						pos = int(fiConf["Bit"])
 
+					# If the layer is a 1D array (bias of convolution layer or gamma or beta parameters of batch normalization layers, for example).
 					if len(v.shape) == 1:
 						train_parameter = train_variables_numpy[ind0[i]]
-						train_parameter_fi = bitflip(train_parameter, pos)
-						train_variables_numpy[ind0[i]] = train_parameter_fi
 					elif len(v.shape) == 2:
 						train_parameter = train_variables_numpy[ind0[i], ind1[i]]
+					else:
+						# Choose the indices for FI
+						train_parameter = train_variables_numpy[ind0[i], ind1[i], ind2[i], ind3[i]]
+
+					if fiFormat == "fp32":
 						train_parameter_fi = bitflip(train_parameter, pos)
+					elif fiFormat == "int8":
+						train_parameter_fi = bitflip_int8(train_parameter.view(dtype=np.int8), pos)
+					else:
+						raise("Formato mal especificado")
+
+					if len(v.shape) == 1:
+						train_variables_numpy[ind0[i]] = train_parameter_fi
+					elif len(v.shape) == 2:
 						train_variables_numpy[ind0[i], ind1[i]] = train_parameter_fi
 					else:
-						train_parameter = train_variables_numpy[ind0[i], ind1[i], ind2[i], ind3[i]]
-						train_parameter_fi = bitflip(train_parameter, pos)
 						train_variables_numpy[ind0[i], ind1[i], ind2[i], ind3[i]] = train_parameter_fi
 
-			v.assign(train_variables_numpy)
+			if (fiFormat == "fp32"):
+				v.assign(train_variables_numpy)
+			else:
+				None
 
 			logging.info("Completed injections... exiting")
 
