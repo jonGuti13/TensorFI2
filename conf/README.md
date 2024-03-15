@@ -44,6 +44,10 @@ The *Bit* is specified only if *bitflips* fault type are chosen. If the user wan
 
 The *Layer* is specified only if *layer_states* Target and *single* Mode are chosen. If the user wants the bit to be flipped by the injector in a randomly chosen layerm, *N* is specified. Otherwise, the layer number where the bit is going to be flipped can be indicated with a value between 0 and *number_of_trainable_parameters* - 1. The number of trainable parameters depends on the model you are woriking with.
 
+#### 7. Format
+
+The *Format* in which the data is represented can be of two types - either "fp32" or "int8". "int8" is only supported if *layer_states* Target and *single* Mode are chosen and if the model has been quantized using TensorFlow Lite.
+
 ### Example configuration files
 
 We provide two example config files and explain the injection for each.
@@ -56,6 +60,7 @@ Mode: single
 Type: bitflips
 Amount: 1
 Bit: 5
+Format: fp32
 ```
 
 This configuration can be used to flip the 5th bit in the output tensor of a randomly chosen layer in the model.
@@ -67,6 +72,7 @@ Target: layer_state
 Mode: multiple
 Type: zeros
 Amount: 10
+Format: fp32
 ```
 
 This configuration can be used to replace 10% of each and every layer state tensors of the model with zeros.

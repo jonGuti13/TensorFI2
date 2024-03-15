@@ -8,6 +8,9 @@ Modifying the layer states is static and is done before the inference runs. This
 
 It is now supported to select the layer where the fault is going to be injected.
 
+TensorFlow Lite INT8 quantized models are also now supported if *single* Mode is chosen
+
+
 ##### Benchmarks and datasets
 
 In this and [tests/layer-outputs](https://github.com/DependableSystemsLab/TensorFI2/blob/master/tests/layer-outputs) directories, we provide the ML models we have tested the tool with. These include smaller models like the simple and convolutional neural networks that work with MNIST and CIFAR-10 datasets to the more complex models like ResNet-50, VGG16, SqueezeNet that use the ImageNet dataset.

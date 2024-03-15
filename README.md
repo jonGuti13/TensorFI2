@@ -89,6 +89,7 @@ Let's see an example of how to inject a bit-flip into a layer state in the model
     Amount: 1
     Bit: N
     Layer: N
+    Format: fp32
 
 When running from the examples in this directory, this is the YAML file that gets picked up by the injector.
 
