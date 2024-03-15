@@ -8,7 +8,7 @@ Modifying the layer states is static and is done before the inference runs. This
 
 It is now supported to select the layer where the fault is going to be injected.
 
-TensorFlow Lite INT8 quantized models are also now supported if *single* Mode is chosen
+TensorFlow Lite INT8/INT32 quantized models are also now supported if *single* Mode is chosen
 
 
 ##### Benchmarks and datasets

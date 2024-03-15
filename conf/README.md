@@ -46,7 +46,7 @@ The *Layer* is specified only if *layer_states* Target and *single* Mode are cho
 
 #### 7. Format
 
-The *Format* in which the data is represented can be of two types - either "fp32" or "int8". "int8" is only supported if *layer_states* Target and *single* Mode are chosen and if the model has been quantized using TensorFlow Lite.
+The *Format* in which the data is represented can be of three types - "fp32", "int8" or "int32". "int8" and "int32" are only supported if *layer_states* Target and *single* Mode are chosen and if the model has been quantized using TensorFlow Lite.
 
 ### Example configuration files
 
